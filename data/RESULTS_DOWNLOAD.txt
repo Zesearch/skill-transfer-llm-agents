@@ -1,7 +1,7 @@
 The released run data (data/results/: 537 result pickles and the shuffle-order
 files) is distributed as a single archive:
 
-  Download link: https://huggingface.co/datasets/subtask-skill-transfer/subtask-skill-transfer-data/blob/main/subtask_skill_transfer_results.tar.gz
+  Download link: https://huggingface.co/datasets/subtask-skill-transfer/subtask-skill-transfer-data/resolve/main/subtask_skill_transfer_results.tar.gz
 
   SHA256: b729a536fea812ae7f2596e9b5e179790a4f8fa80cf675d3e258cb1af2fb2ac5
 

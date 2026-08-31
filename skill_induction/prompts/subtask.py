@@ -77,6 +77,8 @@ SUBTASK_EXECUTION_ROLE: dict[str, str] = {
 <ROLE>
 You are executing a specific subgoal. Focus ONLY on the stated subgoal — do not work on anything else.
 
+Always discover APIs before using them: call show_api_descriptions(app_name) to list available APIs in an app, then show_api_doc(app_name, api_name) to read their parameters and return schemas. ALWAYS verify exact parameter names via show_api_doc before calling an API — do not guess from memory (e.g., login uses 'username', not 'email'). If skills are offered, verify their code matches current API docs before using them.
+
 When (and only when) the subgoal is complete, end it by writing `end_subgoal()` inside a run_code call — there is NO separate end_subgoal tool. You may do real work and then call `end_subgoal()` in the SAME run_code block, or call it alone after your last action. Always do the subgoal's actual work FIRST — never end an empty subgoal. To finish the WHOLE task, run the benchmark's completion action (e.g. apis.supervisor.complete_task()) instead.
 </ROLE>""",
 
@@ -85,6 +87,13 @@ When (and only when) the subgoal is complete, end it by writing `end_subgoal()` 
 <ROLE>
 You are executing a specific subgoal. Focus ONLY on the stated subgoal — do not work on anything else.
 
+Each `run_code` step is one OfficeBench action: either a bare action dict (e.g. `{'app': 'calendar', 'action': 'create_event', 'user': ..., 'summary': ..., 'time_start': ..., 'time_end': ...}`) or Python that assigns the action dict to `action`. Use the exact key names each app expects — sibling actions sometimes disagree (e.g. calendar `create_event` uses `user`, `list_events` uses `username`). There is NO general Python execution — run_code only emits ONE action dict (or `end_subgoal()`); you cannot compute, loop, or store variables.
+
+CRITICAL — never extract / filter / compare / clean / reformat data in your own head or in Python. OfficeBench has an `llm` app for exactly that: `{'app': 'llm', 'action': 'complete_text', 'prompt': <one string that BOTH pastes the raw content you read AND states precisely what to produce>}`. It returns the processed result, which you then write with the relevant app. Use it whenever a step needs reasoning over content, e.g.:
+- "From this OCR table <paste it>, return ONLY the rows where Buyer is 'Alice', as JSON, keeping ALL columns (Date, Car Model, Buyer, Seller, Price)."
+- "From this PDF text <paste it>, extract the name, date, AND address as a contact card."
+Doing the extraction/filtering yourself loses precision (wrong rows, dropped fields, hallucinated values) and fails the task. Read the raw content, hand it to the `llm` app with an exact instruction, then write the llm's output verbatim. Keep EVERY field/row the task could need — do not silently narrow to a subset.
+
 When (and only when) the subgoal is complete, end it by writing `end_subgoal()` inside a run_code call — there is NO separate end_subgoal tool. You may do real work and then call `end_subgoal()` in the SAME run_code block, or call it alone after your last action. Always do the subgoal's actual work FIRST — never end an empty subgoal. To finish the WHOLE task, run the benchmark's completion action (e.g. `{'app': 'system', 'action': 'finish_task', 'answer': ...}`) instead.
 </ROLE>""",
 
@@ -92,6 +101,8 @@ When (and only when) the subgoal is complete, end it by writing `end_subgoal()` 
 
 <ROLE>
 You are executing a specific subgoal of a data-science question. Focus ONLY on the stated subgoal — do not work on anything else.
+
+Variables persist across `run_code` calls (a persistent Python kernel; np / pd pre-imported). The domain data lake is read-only under `./data/`. Inspect before computing: list `data/`, then `df.shape`, `df.columns.tolist()`, `df.head()` (for xlsx, check `pd.ExcelFile(p).sheet_names` first). Build the pipeline incrementally and `print()` only small intermediate values. NEVER print an entire DataFrame / array / raw file — use `.head(n)`, `.shape`, `.columns`, `.describe()`, or a small slice (output is truncated at ~4 KB and large dumps waste the step).
 
 When (and only when) the subgoal is complete, end it by writing `end_subgoal()` inside a run_code call — there is NO separate end_subgoal tool. Always do the subgoal's actual work FIRST — never end an empty subgoal. To finish the WHOLE task (only on the final, completion subgoal), submit the answer with `complete_task(answer=<value>)` instead of `end_subgoal()`.
 </ROLE>""",

@@ -1,6 +1,6 @@
 """SubtaskASI: subtask agent with code-memory skill induction.
 
-At the start of each subgoal the top relevant helper from `ASIMemory` is retrieved, exec()'d into the REPL, and injected into the executor's history. After every `end_subgoal` the executor's reflected summary is followed by an induction call that appends one or more helpers to memory. `check_and_remove_errored` drops helpers whose calls produced tracebacks during the just-finished subgoal.
+At the start of each subgoal the top relevant helper from `ASIMemory` is retrieved, exec()'d into the REPL, and injected into the executor's history. After every `end_subgoal` the executor's reflected summary is followed by an induction call that appends one or more helpers to memory. Helpers whose source fails to load are pruned (with cascade removal of their dependents).
 """
 
 from __future__ import annotations
@@ -67,13 +67,6 @@ class SubtaskASI(SubtaskAgent):
             for name, src in _split_def_blocks([s for _, s in picked]):
                 self._register_function(name, src)
         return retrieved
-
-    def _on_executor_run_code(self, world, code, observation) -> bool:
-        if self.memory is None:
-            return False
-        if hasattr(self.memory, "check_and_remove_errored"):
-            self.memory.check_and_remove_errored(code, observation)
-        return False
 
     def _on_subtask_end(self, world, executor_history, subtask_idx):
         if self.memory is None:

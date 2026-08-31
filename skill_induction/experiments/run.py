@@ -194,13 +194,51 @@ def main() -> int:
                         "benchmark). Online replay: entering each task, the "
                         "memory is set to the exact library the subtask donor "
                         "run had entering that task (no self- or future-skill "
-                        "leakage). Induction is frozen.")
-    p.add_argument("--subtask-skills-stage", default="final_v1",
-                   help="Stage of the donor subtask run whose per-task "
-                        "memory snapshots are replayed (default: final_v1).")
+                        "leakage). Induction is frozen. Legacy alias of "
+                        "`--skills-level subtask`.")
+    p.add_argument("--skills-level", choices=("task", "subtask"), default=None,
+                   help="Skill-transfer arm: granularity of the donor "
+                        "library the LINEAR agent consumes. 'subtask' = the "
+                        "matching subtask agent's atomic library (linear_awm "
+                        "← subtask_awm, linear_asi ← subtask_asi). 'task' = "
+                        "the linear agent's OWN coarse library from the "
+                        "donor stage. Either way the library is replayed per "
+                        "task (donor's entering snapshot, no self- or "
+                        "future-skill leakage) and induction is frozen.")
+    p.add_argument("--skills-half", choices=("all", "high", "low"),
+                   default="all",
+                   help="Which half of the donor library to load, split at "
+                        "the median skill utility (specificity x "
+                        "abstractness; see analysis/skill_utility.py). "
+                        "'high' keeps the top half, 'low' the bottom half; "
+                        "'all' (default) is the whole library. Requires "
+                        "--skills-level.")
+    p.add_argument("--skills-stage", "--subtask-skills-stage",
+                   dest="donor_stage", default="final_v1",
+                   help="Stage of the donor run whose per-task memory "
+                        "snapshots are replayed (default: final_v1).")
+    p.add_argument("--skills-no-threshold", action="store_true",
+                   help="Replay arms only: drop the retrieval similarity "
+                        "floor (MIN_SIMILARITY) so retrieval is pure top-k. "
+                        "Needed for the --skills-half comparison: "
+                        "high-utility skills are broad (abstractness rewards "
+                        "spread), so their nearest-task similarity sits "
+                        "below the floor and the high arm silently starves; "
+                        "this equalizes delivery so the halves differ only "
+                        "in the skills themselves. Requires --skills-level.")
     args = p.parse_args()
-    if args.subtask_skills and args.agent not in ("linear_awm", "linear_asi"):
-        p.error("--subtask-skills requires --agent linear_awm or linear_asi")
+    if args.subtask_skills:
+        if args.skills_level not in (None, "subtask"):
+            p.error("--subtask-skills is the legacy alias of "
+                    "`--skills-level subtask`; don't combine it with "
+                    "--skills-level task")
+        args.skills_level = "subtask"
+    if args.skills_level and args.agent not in ("linear_awm", "linear_asi"):
+        p.error("--skills-level requires --agent linear_awm or linear_asi")
+    if args.skills_half != "all" and not args.skills_level:
+        p.error("--skills-half requires --skills-level")
+    if args.skills_no_threshold and not args.skills_level:
+        p.error("--skills-no-threshold requires --skills-level")
 
     ensure_dirs()
     # Output files are named by the label; everything downstream uses the canonical benchmark, so resolve once here.
@@ -254,19 +292,32 @@ def main() -> int:
     errored_ids = {r["task_id"] for r in results if r.get("errored")}
 
     memory = memory_factory(model) if memory_factory else None
-    # Skill-transfer arm: donor_snapshots[task_id] is the library the donor subtask run had entering that task, so the linear consumer sees no self-induced or future skills.
+    # Skill-transfer arm: donor_snapshots[task_id] is the library the donor run had entering that task, so the consumer sees no self-induced or future skills. With --skills-half, each snapshot is then cut down to one median-utility half of the donor's skill pool.
     donor_snapshots = None
-    args.skills_from = args.skills_stage = None   # stored in records
-    if args.subtask_skills:
-        args.skills_from = ("subtask_awm" if args.agent == "linear_awm"
-                            else "subtask_asi")
-        args.skills_stage = args.subtask_skills_stage
+    # Record fields (None / 'all' outside the arm).
+    args.skills_from = args.skills_stage = None
+    if not args.skills_level:
+        args.skills_half = "all"
+    # 'subtask' would match the demonstration's granularity to the library's; in this codebase the linear demo already IS the stitched executor trajectory, so the knob is a no-op kept for interface parity (see LinearAgent._apply_frozen_skills_prompt).
+    skills_demo = ("subtask" if args.skills_level == "subtask"
+                   and not args.subtask_skills else "linear")
+    if args.skills_level:
+        donor_agent = ({"linear_awm": "subtask_awm",
+                        "linear_asi": "subtask_asi"}[args.agent]
+                       if args.skills_level == "subtask" else args.agent)
+        args.skills_from = donor_agent
+        args.skills_stage = args.donor_stage
         donor_path = cell_result_path(
-            label, args.skills_from, args.model, args.subtask_skills_stage)
+            label, donor_agent, args.model, args.donor_stage)
+        if donor_path == out_path:
+            print(f"FATAL: donor and output are the same cell "
+                  f"({donor_path.name}); give this run a --stage distinct "
+                  f"from --skills-stage.", file=sys.stderr)
+            return 2
         donor_recs = [r for r in _load_pkl(donor_path, [])
                       if not r.get("errored")]
         if not donor_recs:
-            print(f"FATAL: --subtask-skills donor pkl missing or empty: "
+            print(f"FATAL: --skills-level donor pkl missing or empty: "
                   f"{donor_path}", file=sys.stderr)
             return 2
         by_idx = {r["task_idx"]: r for r in donor_recs}
@@ -280,10 +331,31 @@ def main() -> int:
             donor_snapshots[r["task_id"]] = (
                 (prev or {}).get("memory_snapshot")
                 or {"skills": [], "provenance_log": []})
-        print(f"[run] subtask-skills replay: donor={donor_path.name} "
-              f"({len(donor_recs)} records) — per-task entering library, "
-              f"induction frozen")
-    if memory is not None and mem_path.exists() and not args.subtask_skills:
+        if args.skills_no_threshold and memory is not None:
+            # Pure top-k delivery: disarm the similarity floor. Both memories gate on the instance attribute (ASI `>=`, AWM `>`), and best_scores bottoms out at -1.0, so -2.0 passes always.
+            memory.MIN_SIMILARITY = -2.0
+        print(f"[run] skills replay: level={args.skills_level} "
+              f"half={args.skills_half} "
+              f"threshold={'OFF (pure top-k)' if args.skills_no_threshold else 'on'} "
+              f"donor={donor_path.name} ({len(donor_recs)} records) — "
+              f"per-task entering library, induction frozen")
+        if args.skills_half != "all":
+            donor_snapshots = _apply_utility_half(
+                donor_snapshots, donor_recs, args.skills_half,
+                cell_result_path(label, args.agent, args.model, args.stage,
+                                 suffix="_utilsplit"))
+    # The skill-transfer arms all share an --agent, so only the --stage keeps their pkls apart. Refuse to append to a pkl written by a DIFFERENT arm (which would also make resume skip its tasks).
+    prior_arms = ({(r.get("skills_from"), r.get("skills_half") or "all",
+                    bool(r.get("skills_no_threshold"))) for r in results}
+                  - {(args.skills_from, args.skills_half,
+                      args.skills_no_threshold)})
+    if prior_arms:
+        print(f"FATAL: {out_path.name} already holds records from another "
+              f"arm {sorted(map(str, prior_arms))}; this run is "
+              f"({args.skills_from}, {args.skills_half}). Give it its own "
+              f"--stage.", file=sys.stderr)
+        return 2
+    if memory is not None and mem_path.exists() and not args.skills_level:
         snap = _load_pkl(mem_path, None)
         if isinstance(snap, dict):
             payload = snap.get("snapshot") if "snapshot" in snap else snap
@@ -308,7 +380,7 @@ def main() -> int:
     if donor_snapshots is not None:
         missing = [t for t in task_ids if t not in donor_snapshots]
         if missing:
-            print(f"FATAL: --subtask-skills donor lacks {len(missing)} of "
+            print(f"FATAL: skills donor lacks {len(missing)} of "
                   f"the selected tasks (first: {missing[:3]}); finish the "
                   f"donor run first.", file=sys.stderr)
             return 2
@@ -350,9 +422,12 @@ def main() -> int:
             if memory is not None and hasattr(memory, "set_current_task"):
                 memory.set_current_task(task_id)
             model.ledger = ledger
-            # Scope the cache so only an exact same-cell+task replay can hit.
+            # Scope the cache so only an exact same-cell+task replay can hit. The skill-transfer arms share an --agent with the plain cell, and early tasks (empty library) can produce a byte-identical prompt, so the arm is part of the scope too.
+            arm = (f"|{args.skills_level}-{args.skills_half}"
+                   f"{'-nt' if args.skills_no_threshold else ''}"
+                   if args.skills_level else "")
             model.cache_namespace = (
-                f"{args.benchmark}|{args.agent}|{args.model}|{task_id}")
+                f"{args.benchmark}|{args.agent}{arm}|{args.model}|{task_id}")
             try:
                 world_kwargs = dict(
                     task_id=task_id,
@@ -367,10 +442,12 @@ def main() -> int:
                 for _attempt in range(_tries):
                     try:
                         world_kwargs["server_url"] = server_url
-                        # `subtask_skills` is only passed when set; the subtask agents' __init__ doesn't accept it.
+                        # The skills-replay kwargs are only passed when the arm is on; the subtask agents' __init__ doesn't accept them.
                         agent_kwargs = (
-                            {"subtask_skills": True} if args.subtask_skills
-                            else {})
+                            {"skills_replay": True,
+                             "skills_half": args.skills_half,
+                             "skills_demo": skills_demo}
+                            if args.skills_level else {})
                         with WorldCls(**world_kwargs) as world:
                             agent = AgentCls(
                                 model=model, benchmark=args.benchmark,
@@ -450,6 +527,43 @@ def main() -> int:
     return 0
 
 
+def _apply_utility_half(donor_snapshots: dict, donor_recs: list[dict],
+                        half: str, split_path: Path) -> dict:
+    """Cut every replayed snapshot down to one median-utility half of the donor's skill pool.
+
+    The pool is the union of every skill that appears in any entering snapshot (i.e. everything the arm could ever retrieve), scored against the donor cell's task instructions, so a skill's half is fixed for the whole run rather than re-decided as the library grows. The two halves are exact complements. The split is written to `split_path` for the analysis to join on.
+    """
+    from skill_induction.analysis.skill_utility import (
+        split_library, task_instruction,
+    )
+    pool: dict = {}
+    for snap in donor_snapshots.values():
+        for s in (snap or {}).get("skills") or []:
+            if s.get("id") is not None:
+                pool.setdefault(s["id"], s)
+    instructions = [t for t in (task_instruction(r) for r in donor_recs) if t]
+    split = split_library(pool.values(), instructions)
+    keep = split[half]
+    out = {}
+    for task_id, snap in donor_snapshots.items():
+        skills = [s for s in (snap or {}).get("skills") or []
+                  if s.get("id") in keep]
+        out[task_id] = {**(snap or {}), "skills": skills}
+    _save_pkl(split_path, {
+        "half": half, "median_utility": split["median"],
+        "utility": split["utility"],
+        "high_ids": sorted(map(str, split["high"])),
+        "low_ids": sorted(map(str, split["low"])),
+    })
+    sizes = [len(s["skills"]) for s in out.values()]
+    print(f"[run] utility split: pool={len(pool)} skills scored over "
+          f"{len(instructions)} task instructions · median="
+          f"{split['median']:.4f} · keeping the {half} half "
+          f"({len(keep)} skills; per-task library "
+          f"{min(sizes or [0])}-{max(sizes or [0])}) → {split_path.name}")
+    return out
+
+
 def _skill_objs(memory) -> list[dict]:
     """Full skill dicts from the memory snapshot ({} if no memory)."""
     if memory is None:
@@ -474,9 +588,11 @@ def _error_record(args, task_id, idx, ledger, error_msg: str, tb: str) -> dict:
         "agent": args.agent,
         "model": args.model,
         "stage": args.stage,
-        # Skill-transfer arm provenance (None outside --subtask-skills).
+        # Skill-transfer arm provenance (None / 'all' outside the arm).
         "skills_from": args.skills_from,
         "skills_stage": args.skills_stage,
+        "skills_half": args.skills_half,
+        "skills_no_threshold": args.skills_no_threshold,
         "errored": True,
         "error_message": error_msg,
         "traceback": tb,
@@ -548,9 +664,11 @@ def _record(args, task_id, idx, metrics, memory, ledger, pre_skill_ids) -> dict:
         "agent": args.agent,
         "model": args.model,
         "stage": args.stage,
-        # Skill-transfer arm provenance (None outside --subtask-skills).
+        # Skill-transfer arm provenance (None / 'all' outside the arm).
         "skills_from": args.skills_from,
         "skills_stage": args.skills_stage,
+        "skills_half": args.skills_half,
+        "skills_no_threshold": args.skills_no_threshold,
         "completed": metrics["completed"],
         "success": metrics["success"],
         "tgc_score": metrics["tgc_score"],

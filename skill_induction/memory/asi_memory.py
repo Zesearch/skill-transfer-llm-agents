@@ -27,7 +27,7 @@ class ASIMemory(SkillMemory):
         self.max_tokens = max_tokens
         self._skills: list[Skill] = []
         self._entry_embeddings: list = []
-        # Function names retrieved in this task (per-task scope, used for error-based removal).
+        # Function names returned by the latest retrieve() (per-task scope); the agents read it to preload / register the just-retrieved functions and to detect their invocation in executed code.
         self._context_function_names: set[str] = set()
         self.provenance_log: list[dict] = []
         self._current_task_id: Optional[str] = None
@@ -259,21 +259,6 @@ class ASIMemory(SkillMemory):
                     self.provenance_log[-1]["created"].append(name)
                 messages.append(f"[ASI] New function: {name}")
         return messages if messages else ["[ASI] Nothing to save"]
-
-    # error-based removal
-
-    def check_and_remove_errored(self, code: str, observation) -> list[str]:
-        if not self._context_function_names:
-            return []
-        output = str(observation)
-        if "Traceback" not in output and "Error" not in output:
-            return []
-        removed: list[str] = []
-        for fn_name in list(self._context_function_names):
-            if re.search(r"\b" + re.escape(fn_name) + r"\s*\(", code):
-                cascade = self.remove_by_name(fn_name)
-                removed.extend(cascade)
-        return removed
 
     # helpers
 

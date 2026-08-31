@@ -20,7 +20,9 @@ RESULTS = os.path.join(ROOT, "data", "results")
 FRAG_DIR = os.path.join(RESULTS, "inspector_tasks")
 SHELL = os.path.join(ROOT, "data", "inspector.html")
 
-STAGES = ("final_v1", "subskill_v1", "prompt_abl2_L1", "prompt_abl2_L2")
+STAGES = ("final_v1", "noprune_v1", "subskill_v1", "prompt_abl2_L1", "prompt_abl2_L2",
+          "utilnt_task_high_v1", "utilnt_task_low_v1",
+          "utilnt_subtask_high_v1", "utilnt_subtask_low_v1")
 
 FRAG_CSS = """
 body{font-family:system-ui,sans-serif;margin:12px;font-size:13px;color:#222}

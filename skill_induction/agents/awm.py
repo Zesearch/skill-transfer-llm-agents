@@ -20,8 +20,10 @@ class LinearAWM(LinearAgent):
 
     def _build_initial_history(self, task) -> list[dict]:
         history = super()._build_initial_history(task)
-        # Consume-only arm (--subtask-skills): induction never happens, so drop the induction demo.
-        if not self._subtask_skills:
+        if self._skills_replay:
+            # Consume-only arm: induction never happens, so drop the induction demo; the remaining prompt is unchanged (see LinearAgent._apply_frozen_skills_prompt).
+            history = self._apply_frozen_skills_prompt(history)
+        else:
             demo = induction_demo_messages(
                 self.benchmark, variant="linear", level=self._induction_level)
             # Splice the induction demo before the trailer user message, keeping the trailer adjacent to the task it introduces.
@@ -44,7 +46,7 @@ class LinearAWM(LinearAgent):
 
     def _on_task_end(self, world, history, completed: bool) -> None:
         # Induce regardless of `completed`; gating on it would skip induction after a forced finish.
-        if self.memory is None or self._subtask_skills:
+        if self.memory is None or self._skills_replay:
             return
         prompt = create_skill_update_prompt(
             memory_brief=self.memory.get_brief(),

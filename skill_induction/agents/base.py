@@ -109,7 +109,9 @@ class ReactAgent:
         memory=None,
         verbose: bool = False,
         induction_level: int = 3,
-        subtask_skills: bool = False,
+        skills_replay: bool = False,
+        skills_half: str = "all",
+        skills_demo: str = "linear",
     ):
         self.model = model
         self.benchmark = benchmark
@@ -118,8 +120,10 @@ class ReactAgent:
         self.verbose = verbose
         # Prompt-component ablation level for skill induction (memory agents only): 1=instruction-only, 2=+demonstration, 3=+rules (deployed).
         self._induction_level = induction_level
-        # Skill-transfer arm: memory is a frozen, externally supplied library of subtask-induced skills; the agent retrieves from it but never induces into it. Linear memory agents only.
-        self._subtask_skills = subtask_skills
+        # Skill-transfer arm (linear memory agents only): memory is a frozen, externally supplied library; the agent retrieves from it but never induces into it (no induction demo, no task-end induction call). `skills_half` ('all'|'high'|'low') records which utility half of the donor library the runner loaded; `skills_demo` ('linear'|'subtask') which demonstration granularity was requested. Neither changes the prompt here (see LinearAgent._apply_frozen_skills_prompt).
+        self._skills_replay = skills_replay
+        self._skills_half = skills_half
+        self._skills_demo = skills_demo
         self.trace: list[dict] = []
         self.stats = self._init_stats()
         # Per-task function-source registry, populated by ASI subclasses to detect indirect completion through wrappers.

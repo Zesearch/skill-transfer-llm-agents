@@ -24,8 +24,10 @@ class LinearASI(LinearAgent):
 
     def _build_initial_history(self, task) -> list[dict]:
         history = super()._build_initial_history(task)
-        # Consume-only arm (--subtask-skills): drop the induction demo, since induction never runs.
-        if not self._subtask_skills:
+        if self._skills_replay:
+            # Consume-only arm: drop the induction demo, since induction never runs; the remaining prompt is unchanged (see LinearAgent._apply_frozen_skills_prompt).
+            history = self._apply_frozen_skills_prompt(history)
+        else:
             demo = induction_demo_messages(
                 self.benchmark, variant="linear", level=self._induction_level)
             if (len(history) >= 2
@@ -52,7 +54,7 @@ class LinearASI(LinearAgent):
 
     def _on_task_end(self, world, history, completed: bool) -> None:
         # Induce regardless of `completed` (incl. forced completions); a final induction always runs at task end.
-        if self.memory is None or self._subtask_skills:
+        if self.memory is None or self._skills_replay:
             return
         prompt = create_skill_update_prompt(
             memory_brief=self.memory.get_brief(),

@@ -58,7 +58,7 @@ def short(m):
     import re as _r
     return _r.sub(r'-amazon$','',m).replace('qwen-3-','q').replace('gemma-3-','g').replace('nemotron-3-super-','nemo').replace('gpt-oss-','gpt').replace('-a22b','').replace('-120b','').replace('-local','L')
 cells=collections.defaultdict(dict); benches=set(); models=set()
-for p in glob.glob(f"data/*_{STAGE}.pkl"):
+for p in glob.glob(f"data/results/*_{STAGE}.pkl"):
     if "memory" in p: continue
     name=os.path.basename(p)[:-(len(STAGE)+5)]
     for a in sorted(AG,key=len,reverse=True):

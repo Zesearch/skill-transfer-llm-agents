@@ -144,8 +144,6 @@ class SubtaskAgent(ReactAgent):
             pass
 
         task = world.task
-        # Subtask agents need more env-step budget than Linear: each subgoal cycle pays for planner + executor + reflect (+ induction for memory variants), and consolidation discards intra-subgoal state so the executor re-establishes context per subgoal; 75 gives ~5 steps/subgoal headroom across 15 subgoals.
-        max_iter = max(max_iter, 75)
 
         # Planner state: built once, grows each subgoal cycle.
         self._planner_system = build_planner_system_prompt(self.benchmark)
@@ -475,7 +473,7 @@ class SubtaskAgent(ReactAgent):
         )
 
     def _on_executor_run_code(self, world, code, observation) -> bool:
-        """Hook for subclasses (e.g. ASI error-based removal)."""
+        """Hook for subclasses; called after every real run_code execution."""
         return False
 
     def _check_task_completed(self, code, observation) -> bool:

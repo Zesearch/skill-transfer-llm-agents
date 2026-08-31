@@ -1,0 +1,18 @@
+The released run data (data/results/: 537 result pickles and the shuffle-order
+files) is distributed as a single archive:
+
+  Download link: https://huggingface.co/datasets/subtask-skill-transfer/subtask-skill-transfer-data/blob/main/subtask_skill_transfer_results.tar.gz
+
+  SHA256: b729a536fea812ae7f2596e9b5e179790a4f8fa80cf675d3e258cb1af2fb2ac5
+
+Setup after download:
+
+  cd data/
+  tar xzf subtask_skill_transfer_results.tar.gz
+
+This creates data/results/. The paper figures notebook (AAA_final_paper_plot.ipynb)
+reads from that directory directly. The trajectory viewer (inspector.html) needs its
+per-task HTML fragments, which are not included in the archive; rebuild them once
+from the pickles (standard library only, no extra dependencies):
+
+  python scripts/build_inspector.py

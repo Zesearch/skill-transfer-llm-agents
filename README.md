@@ -1,7 +1,7 @@
 # Break It Down, Pass It On: Cross-Task Skill Transfer in LLM Agents
 
 <p align="center">
-   <a href="https://zesearch.github.io/subtask-skill-transfer" target="_blank">🌐 Website</a> | <a href="https://arxiv.org/pdf/2608.20274v1" target="_blank">📃 Paper </a> | <a href="" target="_blank">𝕏 X (Twitter)</a>
+   <a href="https://zesearch.github.io/subtask-skill-transfer" target="_blank">🌐 Website</a> | <a href="https://arxiv.org/pdf/2608.20274v1" target="_blank">📃 Paper </a> | <a href="https://huggingface.co/datasets/subtask-skill-transfer/subtask-skill-transfer-data" target="_blank">🤗 Data</a> | <a href="" target="_blank">𝕏 X (Twitter)</a>
 </p>
 
 We have released the official code and data for the paper [*"Break It Down, Pass It On: Cross-Task Skill Transfer in LLM Agents"*](https://arxiv.org/abs/2608.20274).

@@ -1,5 +1,9 @@
 # Break It Down, Pass It On: Cross-Task Skill Transfer in LLM Agents
 
+<p align="center">
+   <a href="https://zesearch.github.io/subtask-skill-transfer" target="_blank">🌐 Website</a> | <a href="https://arxiv.org/pdf/2608.20274v1" target="_blank">📃 Paper </a> | <a href="" target="_blank">𝕏 X (Twitter)</a>
+</p>
+
 We have released the official code and data for the paper [*"Break It Down, Pass It On: Cross-Task Skill Transfer in LLM Agents"*](https://arxiv.org/abs/2608.20274).
 
 Large language model (LLM) agents can induce skills from completed tasks and reuse them later to grow more capable with experience. In practice those skills transfer unreliably, and can even harm the agent that retrieves them. We study when they transfer reliably, comparing the two axes along which existing methods differ: task-level versus subtask-level skill induction, and text versus code skill formats, across three long-horizon benchmarks and eleven models.

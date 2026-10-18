@@ -101,9 +101,7 @@ class SubtaskAgent(ReactAgent):
         self.tools = self.executor_tools
 
         # OfficeBench tasks are short; the iterative planner ignores the prompt's "<=5" guidance and over-decomposes, adding handoff overhead and non-actionable steps, so hard-cap it.
-        self.MAX_SUBGOALS = (
-            6 if getattr(self, "benchmark", None) == "officebench"
-            else max_subtasks)
+        self.MAX_SUBGOALS = max_subtasks
         # `max_iter_per_subtask` is accepted for signature compatibility but intentionally not used as a cap (no per-subtask limit).
         _ = max_iter_per_subtask
 

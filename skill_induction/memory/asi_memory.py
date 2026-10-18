@@ -17,7 +17,7 @@ class ASIMemory(SkillMemory):
     # Retrieval returns the top-k skills above this cosine similarity.
     MIN_SIMILARITY = 0.30
     # New functions whose description near-duplicates an existing skill are dropped instead of growing the library.
-    DEDUP_THRESHOLD = 0.93
+    DEDUP_THRESHOLD = 0.85
 
     def __init__(self, model=None, *, benchmark: str = "appworld",
                  top_k: int = 5, max_tokens: int = 8192):

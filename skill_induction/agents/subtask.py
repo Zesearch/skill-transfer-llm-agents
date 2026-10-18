@@ -99,8 +99,6 @@ class SubtaskAgent(ReactAgent):
         self.planner_tools = [plan_option_tool()]
         # The ReactAgent.run_task path is unused for this subclass, but some base helpers read `self.tools`, so keep it sane.
         self.tools = self.executor_tools
-
-        # OfficeBench tasks are short; the iterative planner ignores the prompt's "<=5" guidance and over-decomposes, adding handoff overhead and non-actionable steps, so hard-cap it.
         self.MAX_SUBGOALS = max_subtasks
         # `max_iter_per_subtask` is accepted for signature compatibility but intentionally not used as a cap (no per-subtask limit).
         _ = max_iter_per_subtask

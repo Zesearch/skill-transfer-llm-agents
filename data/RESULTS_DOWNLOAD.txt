@@ -10,7 +10,7 @@ Setup after download:
   cd data/
   tar xzf subtask_skill_transfer_results.tar.gz
 
-This creates data/results/. The paper figures notebook (AAA_final_paper_plot.ipynb)
+This creates data/results/. The paper figures notebook (final_paper_plot.ipynb)
 reads from that directory directly. The trajectory viewer (inspector.html) needs its
 per-task HTML fragments, which are not included in the archive; rebuild them once
 from the pickles (standard library only, no extra dependencies):

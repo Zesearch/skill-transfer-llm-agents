@@ -15,11 +15,11 @@ class AWMMemory(SkillMemory):
     MAX_ENTRIES = 30
     MAX_LINES = 15
     # Retrieval returns the top-k skills above this cosine similarity; text notes use top-3 above 0.45, code skills top-5 above 0.30 (see ASIMemory).
-    MIN_SIMILARITY = 0.45
+    MIN_SIMILARITY = 0.3
     MERGE_THRESHOLD = 0.85
 
     def __init__(self, model=None, *, benchmark: str = "appworld",
-                 top_k: int = 3, max_tokens: int = 8192):
+                 top_k: int = 5, max_tokens: int = 8192):
         self.model = model
         self.benchmark = benchmark
         self.top_k = top_k

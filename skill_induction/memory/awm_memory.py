@@ -14,7 +14,7 @@ from skill_induction.memory._embed import _model
 class AWMMemory(SkillMemory):
     MAX_ENTRIES = 30
     MAX_LINES = 15
-    # Retrieval returns the top-k skills above this cosine similarity; text notes use top-3 above 0.45, code skills top-5 above 0.30 (see ASIMemory).
+    # Retrieval returns the top-k skills above this cosine similarity; text notes use top-3 above 0.5, code skills top-5 above 0.30 (see ASIMemory).
     MIN_SIMILARITY = 0.3
     MERGE_THRESHOLD = 0.85
 
